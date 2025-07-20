@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { type Database as DB } from "better-sqlite3";
 
 export function extractText(filePath: string): string | null {
   const extension = path.extname(filePath);
@@ -14,15 +15,17 @@ export function chunkText(text: string, chunkSize: number, overlap: number): str
   const chunks: string[] = [];
   let i = 0;
   while (i < text.length) {
-    chunks.push(text.slice(i, i + chunkSize));
+    const chunk = text.slice(i, i + chunkSize);
+    chunks.push(chunk);
+    if (chunk.length < chunkSize) {
+      break;
+    }
     i += chunkSize - overlap;
   }
   return chunks;
 }
 
-export function crawlAndIndex(db: any, dir: string) {
-    const files = crawlDirectory(dir);
-
+export function indexFiles(db: DB, files: string[]) {
     for (const file of files) {
         const text = extractText(file);
         if (text) {
@@ -52,6 +55,11 @@ export function crawlAndIndex(db: any, dir: string) {
             }
         }
     }
+}
+
+export function crawlAndIndex(db: DB, dir: string) {
+    const files = crawlDirectory(dir);
+    indexFiles(db, files);
 }
 
 export function crawlDirectory(dir: string): string[] {
