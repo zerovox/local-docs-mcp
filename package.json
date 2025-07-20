@@ -1,0 +1,24 @@
+{
+  "name": "local-docs-mcp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/zerovox/local-docs-mcp.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zerovox/local-docs-mcp/issues"
+  },
+  "homepage": "https://github.com/zerovox/local-docs-mcp#readme",
+  "description": "",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.16.0",
+    "better-sqlite3": "^12.2.0",
+    "sqlite-vec": "^0.1.7-alpha.2"
+  }
+}
