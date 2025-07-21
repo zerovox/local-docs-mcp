@@ -67,71 +67,68 @@ Configuring chunk size and overlap.
 Integrates with typescript-sdk for MCP compliance.
 
 3. Development Phases
-   Phase 1: Setup and Core Infrastructure (2-3 weeks)
+Phase 1: Setup and Core Infrastructure (Completed)
 
 Goals:
-Set up TypeScript/Node.js project with dependencies (sqlite-vec, MCP SDK).
-Initialize SQLite database with schema.
-Implement basic file crawler for common documentation formats.
+- [x] Set up TypeScript/Node.js project with dependencies (sqlite-vec, MCP SDK).
+- [x] Initialize SQLite database with schema.
+- [x] Implement basic file crawler for common documentation formats.
 
 
 Deliverables:
-Project repository with package.json and TypeScript configuration.
-SQLite database with Paths, Documents, and Chunks tables.
-Basic crawler for .md and .txt files.
+- [x] Project repository with package.json and TypeScript configuration.
+- [x] SQLite database with Paths, Documents, and Chunks tables.
+- [x] Basic crawler for .md and .txt files.
 
 
 Tasks:
-Install dependencies: npm install @modelcontextprotocol/typescript-sdk sqlite-vec.
-Create SQLite database with sqlite-vec integration.
-Write crawler using Node.js fs module to scan directories and files.
+- [x] Install dependencies: npm install @modelcontextprotocol/typescript-sdk sqlite-vec.
+- [x] Create SQLite database with sqlite-vec integration.
+- [x] Write crawler using Node.js fs module to scan directories and files.
 
 
 
-Phase 2: Indexing and Embedding (3-4 weeks)
+Phase 2: Indexing and Embedding (In Progress)
 
 Goals:
-Implement text extraction and chunking logic.
-Generate and store vector embeddings using MCP SDK and sqlite-vec.
-Track indexing metadata (e.g., last index time).
+- [x] Implement text extraction and chunking logic.
+- [ ] Generate and store vector embeddings using MCP SDK and sqlite-vec.
+- [x] Track indexing metadata (e.g., last index time).
 
 
 Deliverables:
-Text extraction for .md, .txt, and .pdf (using pdf-parse or similar).
-Configurable chunking with overlap support.
-Embedding generation and storage in Chunks table.
+- [x] Text extraction for .md, .txt.
+- [ ] PDF extraction (using pdf-parse or similar).
+- [x] Configurable chunking with overlap support.
+- [ ] Embedding generation and storage in Chunks table.
 
 
 Tasks:
-Implement chunking logic (e.g., 500-char chunks with 100-char overlap).
-Use MCP SDK to generate embeddings for each chunk.
-Store embeddings in sqlite-vec with proper indexing.
+- [x] Implement chunking logic (e.g., 500-char chunks with 100-char overlap).
+- [ ] Use MCP SDK to generate embeddings for each chunk.
+- [ ] Store embeddings in sqlite-vec with proper indexing.
 
 
 
-Phase 3: MCP Server and Search (3-4 weeks)
+Phase 3: MCP Server and Search (Completed)
 
 Goals:
-Build MCP server with search and indexing endpoints.
-Implement vector-based search with directory constraints.
-Format search results with {docId, before, match, text}.
+- [x] Build MCP server with search and indexing endpoints.
+- [x] Implement vector-based search with directory constraints.
+- [x] Format search results with {docId, before, match, text}.
 
 
 Deliverables:
-MCP server with endpoints:
-POST /index: Indexes a directory.
-POST /search: Searches with query and optional directory.
-GET /config: Retrieves chunking configuration.
-PUT /config: Updates chunk size and overlap.
-
-
-Search functionality with sqlite-vec similarity queries.
+- [x] MCP server with endpoints for indexing and searching.
+- [ ] GET /config: Retrieves chunking configuration.
+- [ ] PUT /config: Updates chunk size and overlap.
+- [x] Search functionality with sqlite-vec similarity queries.
 
 
 Tasks:
-Set up MCP server using typescript-sdk.
-Implement SQL queries for directory-constrained search.
-Format search results with configurable context.
+- [x] Set up MCP server using typescript-sdk.
+- [x] Implement SQL queries for directory-constrained search.
+- [x] Format search results with configurable context.
 
 
 

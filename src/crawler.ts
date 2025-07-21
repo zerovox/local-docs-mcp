@@ -25,7 +25,7 @@ export function chunkText(text: string, chunkSize: number, overlap: number): str
   return chunks;
 }
 
-export function indexFiles(db: DB, files: string[]) {
+export async function indexFiles(db: DB, server: McpServer, files: string[]) {
     for (const file of files) {
         const text = extractText(file);
         if (text) {
@@ -47,19 +47,20 @@ export function indexFiles(db: DB, files: string[]) {
                 const start_offset = i * (500 - 100);
                 const end_offset = start_offset + chunk.length;
 
-                // Placeholder for embedding
-                const embedding = null;
-
+                const embedding = await createEmbedding(server, chunk, process.env.USE_OLLAMA === 'true');
                 db.prepare("INSERT OR REPLACE INTO Chunks (chunkId, docId, start_offset, end_offset, text, embedding) VALUES (?, ?, ?, ?, ?, ?)")
-                  .run(chunkId, docId, start_offset, end_offset, chunk, embedding);
+                    .run(chunkId, docId, start_offset, end_offset, chunk, embedding.buffer);
             }
         }
     }
 }
 
-export function crawlAndIndex(db: DB, dir: string) {
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import { createEmbedding } from "./embeddings";
+
+export function crawlAndIndex(db: DB, server: McpServer, dir: string) {
     const files = crawlDirectory(dir);
-    indexFiles(db, files);
+    indexFiles(db, server, files);
 }
 
 export function crawlDirectory(dir: string): string[] {
