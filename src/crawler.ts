@@ -1,0 +1,82 @@
+import * as fs from "fs";
+import * as path from "path";
+import { type Database as DB } from "better-sqlite3";
+
+export function extractText(filePath: string): string | null {
+  const extension = path.extname(filePath);
+  if (extension !== ".md" && extension !== ".txt") {
+    return null;
+  }
+
+  return fs.readFileSync(filePath, "utf-8");
+}
+
+export function chunkText(text: string, chunkSize: number, overlap: number): string[] {
+  const chunks: string[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const chunk = text.slice(i, i + chunkSize);
+    chunks.push(chunk);
+    if (chunk.length < chunkSize) {
+      break;
+    }
+    i += chunkSize - overlap;
+  }
+  return chunks;
+}
+
+export async function indexFiles(db: DB, server: McpServer, files: string[]) {
+    for (const file of files) {
+        const text = extractText(file);
+        if (text) {
+            const docId = file;
+            const chunks = chunkText(text, 500, 100);
+
+            db.prepare("INSERT OR REPLACE INTO Paths (path, is_directory, last_indexed) VALUES (?, ?, ?)")
+              .run(path.dirname(file), true, new Date().toISOString());
+
+            db.prepare("INSERT OR REPLACE INTO Paths (path, is_directory, last_indexed) VALUES (?, ?, ?)")
+              .run(file, false, new Date().toISOString());
+
+            db.prepare("INSERT OR REPLACE INTO Documents (docId, path, raw_text, last_modified) VALUES (?, ?, ?, ?)")
+              .run(docId, file, text, new Date().toISOString());
+
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                const chunkId = `${docId}-${i}`;
+                const start_offset = i * (500 - 100);
+                const end_offset = start_offset + chunk.length;
+
+                const embedding = await createEmbedding(server, chunk, process.env.USE_OLLAMA === 'true');
+                db.prepare("INSERT OR REPLACE INTO Chunks (chunkId, docId, start_offset, end_offset, text, embedding) VALUES (?, ?, ?, ?, ?, ?)")
+                    .run(chunkId, docId, start_offset, end_offset, chunk, embedding.buffer);
+            }
+        }
+    }
+}
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp";
+import { createEmbedding } from "./embeddings";
+
+export function crawlAndIndex(db: DB, server: McpServer, dir: string) {
+    const files = crawlDirectory(dir);
+    indexFiles(db, server, files);
+}
+
+export function crawlDirectory(dir: string): string[] {
+  const files: string[] = [];
+  const items = fs.readdirSync(dir);
+
+  for (const item of items) {
+    const fullPath = path.join(dir, item);
+    const stat = fs.statSync(fullPath);
+
+    if (stat.isDirectory()) {
+      files.push(...crawlDirectory(fullPath));
+    } else {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
