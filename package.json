@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "ts-node src/server.ts > server.log 2>&1 &",
+    "dev": "ts-node src/server.ts",
     "test": "jest"
   },
   "repository": {

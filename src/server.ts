@@ -5,7 +5,6 @@ import { initializeDatabase } from "./db";
 import { crawlAndIndex } from "./crawler";
 import { type Database as DB } from "better-sqlite3";
 import { createEmbedding } from "./embeddings";
-
 import { CallToolResult } from '@modelcontextprotocol/sdk/types';
 
 export async function searchHandler(db: DB, server: McpServer, { query, path }: { query: string; path?: string }): Promise<CallToolResult> {
