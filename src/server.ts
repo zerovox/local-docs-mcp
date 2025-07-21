@@ -6,56 +6,24 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { initializeDatabase } from "./db";
 import { crawlAndIndex } from "./crawler";
-import { type Database as DB } from "better-sqlite3";
-import { createEmbedding } from "./embeddings";
+import { queryEmbeddings } from "./embeddings";
 import { CallToolResult } from '@modelcontextprotocol/sdk/types';
+import { LocalIndex } from "vectra";
 
-export async function searchHandler(db: DB, { query, path }: { query: string; path?: string }): Promise<CallToolResult> {
+export async function searchHandler(index: LocalIndex, { query, path }: { query: string; path?: string }): Promise<CallToolResult> {
     try {
-        const queryEmbedding = await createEmbedding(query);
-
-        let rows;
-        if (path) {
-            const statement = db.prepare(`
-                SELECT c.docId, d.raw_text, c.text, c.start_offset, v.distance
-                FROM ChunkVec v
-                JOIN Chunk c ON v.rowid = c.rowid
-                JOIN Document d ON c.docId = d.docId
-                JOIN Path p ON d.path = p.path
-                WHERE p.path LIKE ?
-                  AND v.embedding MATCH ? AND k = 3
-                ORDER BY v.distance
-                LIMIT 10
-            `);
-            // LIMIT is present, so this is correct for vec0
-            rows = statement.all(`${path}%`, new Uint8Array(queryEmbedding.buffer));
-        } else {
-            const statement = db.prepare(`
-                SELECT c.docId, d.raw_text, c.text, c.start_offset, v.distance
-                FROM ChunkVec v
-                JOIN Chunk c ON v.rowid = c.rowid
-                JOIN Document d ON c.docId = d.docId
-                WHERE v.embedding MATCH ? AND k = 3
-                ORDER BY v.distance
-                LIMIT 10
-            `);
-            // LIMIT is present, so this is correct for vec0
-            rows = statement.all(new Uint8Array(queryEmbedding.buffer));
-        }
-
-        const results = rows.map((row: any) => {
-            const { docId, raw_text, text, start_offset } = row;
-            const before = raw_text.slice(0, start_offset);
+        const results = await queryEmbeddings(query);
+        const content = results.map(result => {
+            const metadata = result.item.metadata as { docId: string, text: string };
             return {
-                docId,
-                before,
-                match: text,
-                text: raw_text,
+                docId: metadata.docId,
+                score: result.score,
+                text: metadata.text,
             };
         });
 
         return {
-            content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+            content: [{ type: "text", text: JSON.stringify(content, null, 2) }],
         };
     } catch (error: any) {
         console.error("Error during search:", error);
@@ -66,54 +34,54 @@ export async function searchHandler(db: DB, { query, path }: { query: string; pa
     }
 }
 
-function setupMcpServer(db: DB) {
-  const server = new McpServer({
-    name: "local-docs-mcp",
-    version: "1.0.0",
-  });
+function setupMcpServer(index: LocalIndex) {
+    const server = new McpServer({
+        name: "local-docs-mcp",
+        version: "1.0.0",
+    });
 
-  server.registerTool(
-    "index",
-    {
-      title: "Index Directory",
-      description: "Index a directory of documents.",
-      inputSchema: {
-        path: z.string().describe("The path to the directory to index."),
-      },
-    },
-    async ({ path }) => {
-      try {
-        await crawlAndIndex(db, path);
-        return {
-          content: [{ type: "text", text: `Successfully indexed ${path}` }],
-        };
-      } catch (error: any) {
-        return {
-          content: [{ type: "text", text: `Error indexing ${path}: ${error.message}` }],
-          isError: true,
-        };
-      }
-    }
-  );
+    server.registerTool(
+        "index",
+        {
+            title: "Index Directory",
+            description: "Index a directory of documents.",
+            inputSchema: {
+                path: z.string().describe("The path to the directory to index."),
+            },
+        },
+        async ({ path }) => {
+            try {
+                await crawlAndIndex(path);
+                return {
+                    content: [{ type: "text", text: `Successfully indexed ${path}` }],
+                };
+            } catch (error: any) {
+                return {
+                    content: [{ type: "text", text: `Error indexing ${path}: ${error.message}` }],
+                    isError: true,
+                };
+            }
+        }
+    );
 
-  server.registerTool(
-    "search",
-    {
-      title: "Search Documents",
-      description: "Search for documents.",
-      inputSchema: {
-        query: z.string().describe("The search query."),
-        path: z.string().optional().describe("The path to the directory to search in."),
-      },
-    },
-    (params) => searchHandler(db, params)
-  );
+    server.registerTool(
+        "search",
+        {
+            title: "Search Documents",
+            description: "Search for documents.",
+            inputSchema: {
+                query: z.string().describe("The search query."),
+                path: z.string().optional().describe("The path to the directory to search in."),
+            },
+        },
+        (params) => searchHandler(index, params)
+    );
 
-  return server;
+    return server;
 }
 
 async function main() {
-  const db = initializeDatabase();
+  const index = await initializeDatabase();
 
   const app = express();
   app.use(express.json());
@@ -144,7 +112,7 @@ async function main() {
         }
       };
 
-      const server = setupMcpServer(db);
+      const server = setupMcpServer(index);
       await server.connect(transport);
     } else {
       res.status(400).json({

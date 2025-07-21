@@ -1,69 +1,56 @@
 import * as fs from "fs";
 import * as path from "path";
-import { type Database as DB } from "better-sqlite3";
-import { createEmbedding } from "./embeddings";
+import { createEmbedding, storeEmbeddings } from "./embeddings";
+import { getIndex } from "./db";
 
 export function extractText(filePath: string): string | null {
-  const extension = path.extname(filePath);
-  if (extension !== ".md" && extension !== ".txt") {
-    return null;
-  }
+    const extension = path.extname(filePath);
+    if (extension !== ".md" && extension !== ".txt") {
+        return null;
+    }
 
-  return fs.readFileSync(filePath, "utf-8");
+    return fs.readFileSync(filePath, "utf-8");
 }
 
 export function chunkText(text: string, chunkSize: number, overlap: number): string[] {
-  const chunks: string[] = [];
-  let i = 0;
-  while (i < text.length) {
-    const chunk = text.slice(i, i + chunkSize);
-    chunks.push(chunk);
-    if (chunk.length < chunkSize) {
-      break;
+    const chunks: string[] = [];
+    let i = 0;
+    while (i < text.length) {
+        const chunk = text.slice(i, i + chunkSize);
+        chunks.push(chunk);
+        if (chunk.length < chunkSize) {
+            break;
+        }
+        i += chunkSize - overlap;
     }
-    i += chunkSize - overlap;
-  }
-  return chunks;
+    return chunks;
 }
 
-export async function indexFiles(db: DB, files: string[]) {
+export async function indexFiles(files: string[]) {
+    const index = getIndex();
     for (const file of files) {
         const text = extractText(file);
         if (text) {
             const docId = file;
             const chunks = chunkText(text, 500, 100);
 
-            db.prepare("INSERT OR REPLACE INTO Path (path, is_directory, last_indexed) VALUES (?, ?, ?)")
-              .run(path.dirname(file), 1, new Date().toISOString());
-
-            db.prepare("INSERT OR REPLACE INTO Path (path, is_directory, last_indexed) VALUES (?, ?, ?)")
-              .run(file, 0, new Date().toISOString());
-
-            db.prepare("INSERT OR REPLACE INTO Document (docId, path, raw_text, last_modified) VALUES (?, ?, ?, ?)")
-              .run(docId, file, text, new Date().toISOString());
-
-            for (let i = 0; i < chunks.length; i++) {
-                const chunk = chunks[i];
-                const chunkId = `${docId}-${i}`;
-                const start_offset = i * (500 - 100);
-                const end_offset = start_offset + chunk.length;
-
+            const embeddings = await Promise.all(chunks.map(async (chunk) => {
                 const embedding = await createEmbedding(chunk);
-                // Ensure embedding.buffer is a Buffer, string, or null
-                const embeddingBuffer = Buffer.isBuffer(embedding.buffer)
-                  ? embedding.buffer
-                  : Buffer.from(embedding.buffer);
+                return { text: chunk, embedding, docId };
+            }));
 
-                db.prepare("INSERT OR REPLACE INTO Chunk (chunkId, docId, start_offset, end_offset, text, embedding) VALUES (?, ?, ?, ?, ?, ?)")
-                    .run(chunkId, docId, start_offset, end_offset, chunk, embeddingBuffer);
-            }
+            await storeEmbeddings(embeddings.map(e => ({
+                text: e.text,
+                embedding: e.embedding,
+                metadata: { docId: e.docId }
+            })));
         }
     }
 }
 
-export function crawlAndIndex(db: DB, dir: string) {
+export async function crawlAndIndex(dir: string) {
     const files = crawlDirectory(dir);
-    indexFiles(db, files);
+    await indexFiles(files);
 }
 
 export function crawlDirectory(dir: string): string[] {
